@@ -262,7 +262,7 @@ class Channel:
         return output, processed_output
 
     def send_inputs_interact(
-        self, channel_inputs: List[str], hidden_response: bool = False
+        self, channel_inputs: List[List[str]], hidden_response: bool = False
     ) -> Response:
         """
         Send inputs in an interactive fashion, used to handle prompts that occur after an input.
@@ -284,16 +284,19 @@ class Channel:
         """
         if not isinstance(channel_inputs, list):
             raise TypeError(f"`send_inputs_interact` expects a List, got {type(channel_inputs)}")
-        channel_input, expectation, channel_response, finale = channel_inputs
+        # channel_input, expectation, channel_response, finale = channel_inputs
+        channel_input, interactions, finale = channel_inputs
         response = Response(
             self.transport.host,
             channel_input,
-            expectation=expectation,
-            channel_response=channel_response,
+            interactions=interactions,
+            # expectation=expectation,
+            # channel_response=channel_response,
             finale=finale,
         )
         raw_result, processed_result = self._send_input_interact(
-            channel_input, expectation, channel_response, finale, hidden_response
+            # channel_input, expectation, channel_response, finale, hidden_response
+            channel_input, interactions, finale, hidden_response
         )
         response.raw_result = raw_result.decode()
         response.record_response(processed_result.decode().strip())
@@ -303,8 +306,9 @@ class Channel:
     def _send_input_interact(
         self,
         channel_input: str,
-        expectation: str,
-        channel_response: str,
+        # expectation: str,
+        # channel_response: str,
+        interactions: list,
         finale: str,
         hidden_response: bool = False,
     ) -> Tuple[bytes, bytes]:
@@ -330,8 +334,9 @@ class Channel:
         self.transport.session_lock.acquire()
         LOG.debug(
             f"Attempting to send input interact: {channel_input}; "
-            f"\texpecting: {expectation};"
-            f"\tresponding: {channel_response};"
+            f"\tinteractions: {interactions};"
+            # f"\texpecting: {expectation};"
+            # f"\tresponding: {channel_response};"
             f"\twith a finale: {finale};"
             f"\thidden_response: {hidden_response}"
         )
@@ -339,15 +344,17 @@ class Channel:
         LOG.debug(f"Write: {repr(channel_input)}")
         self._read_until_input(bytes_channel_input)
         self._send_return()
-        output = self._read_until_prompt(prompt=expectation)
-        # if response is simply a return; add that so it shows in output likewise if response is
-        # "hidden" (i.e. password input), add return, otherwise, skip
-        if not channel_response or hidden_response is True:
-            output += self.comms_return_char.encode()
-        self.transport.write(channel_response)
-        LOG.debug(f"Write: {repr(channel_response)}")
-        self._send_return()
-        LOG.debug(f"Write (sending return character): {repr(self.comms_return_char)}")
+        output = ""
+        for expectation, channel_response in interactions:
+            output = self._read_until_prompt(prompt=expectation)
+            # if response is simply a return; add that so it shows in output likewise if response is
+            # "hidden" (i.e. password input), add return, otherwise, skip
+            if not channel_response or hidden_response is True:
+                output += self.comms_return_char.encode()
+            self.transport.write(channel_response)
+            LOG.debug(f"Write: {repr(channel_response)}")
+            self._send_return()
+            LOG.debug(f"Write (sending return character): {repr(self.comms_return_char)}")
         output += self._read_until_prompt(prompt=finale)
         self.transport.session_lock.release()
         processed_output = self._restructure_output(output, strip_prompt=False)

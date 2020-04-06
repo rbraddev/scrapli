@@ -13,6 +13,7 @@ class Response:
         channel_input: str,
         textfsm_platform: str = "",
         genie_platform: str = "",
+        interactions: Optional[list] = None,
         expectation: Optional[str] = None,
         channel_response: Optional[str] = None,
         finale: Optional[str] = None,
@@ -52,6 +53,7 @@ class Response:
         self.channel_input = channel_input
         self.textfsm_platform = textfsm_platform
         self.genie_platform = genie_platform
+        self.interactions = interactions
         self.expectation = expectation
         self.channel_response = channel_response
         self.finale = finale
